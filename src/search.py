@@ -1,14 +1,17 @@
+
 import redis
 import json
 import numpy as np
-#from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 import ollama
 from redis.commands.search.query import Query
+import time
+import psutil
+import os
 from redis.commands.search.field import VectorField, TextField
 
 
 # Initialize models
-# embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 redis_client = redis.StrictRedis(host="localhost", port=6379, decode_responses=True)
 
 VECTOR_DIM = 768
@@ -16,8 +19,12 @@ INDEX_NAME = "embedding_index"
 DOC_PREFIX = "doc:"
 DISTANCE_METRIC = "COSINE"
 
+# def cosine_similarity(vec1, vec2):
+#     """Calculate cosine similarity between two vectors."""
+#     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
-def get_embedding(text: str, model: str = "nomic-embed-text") -> list:
+
+def get_embedding(text: str, model: str = "mistral:latest") -> list:
 
     response = ollama.embeddings(model=model, prompt=text)
     return response["embedding"]
@@ -85,8 +92,8 @@ def generate_rag_response(query, context_results):
     print(f"context_str: {context_str}")
 
     # Construct prompt with context
-    prompt = f"""You are a helpful AI assistant.
-    Use the following context to answer the query as accurately as possible. If the context is
+    prompt = f"""You are a helpful AI assistant. 
+    Use the following context to answer the query as accurately as possible. If the context is 
     not relevant to the query, say 'I don't know'.
 
 Context:
@@ -104,6 +111,11 @@ Answer:"""
     return response["message"]["content"]
 
 
+def get_memory_usage():
+    process = psutil.Process(os.getpid())
+    memory = process.memory_info()
+    return memory.rss / (1024 * 1024)
+
 def interactive_search():
     """Interactive search interface."""
     print("🔍 RAG Search Interface")
@@ -115,14 +127,25 @@ def interactive_search():
         if query.lower() == "exit":
             break
 
+        start_time = time.time()
+        start_memory = get_memory_usage()
+
         # Search for relevant embeddings
         context_results = search_embeddings(query)
 
         # Generate RAG response
         response = generate_rag_response(query, context_results)
 
+        end_time = time.time()
+        end_memory = get_memory_usage()
+        execution_time = end_time - start_time
+        memory_used = end_memory - start_memory
+
         print("\n--- Response ---")
         print(response)
+
+        print(f"\nExecution Time: {execution_time} seconds")
+        print(f"Memory Usage: {memory_used} MB")
 
 
 # def store_embedding(file, page, chunk, embedding):

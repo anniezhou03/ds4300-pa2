@@ -6,6 +6,9 @@ import numpy as np
 from redis.commands.search.query import Query
 import os
 import fitz
+import time
+import psutil
+
 
 # Initialize Redis connection
 redis_client = redis.Redis(host="localhost", port=6379, db=0)
@@ -41,7 +44,9 @@ def create_hnsw_index():
 
 
 # Generate an embedding using nomic-embed-text
-def get_embedding(text: str, model: str = "nomic-embed-text") -> list:
+#def get_embedding(text: str, model: str = "nomic-embed-text") -> list:
+#def get_embedding(text: str, model: str = "mxbai-embed-large") -> list:
+def get_embedding(text: str, model: str = "all-minilm") -> list:
 
     response = ollama.embeddings(model=model, prompt=text)
     return response["embedding"]
@@ -75,7 +80,7 @@ def extract_text_from_pdf(pdf_path):
 
 
 # split the text into chunks with overlap
-def split_text_into_chunks(text, chunk_size=300, overlap=50):
+def split_text_into_chunks(text, chunk_size=500, overlap=50):
     """Split text into chunks of approximately chunk_size words with overlap."""
     words = text.split()
     chunks = []
@@ -125,6 +130,10 @@ def query_redis(query_text: str):
     for doc in res.docs:
         print(f"{doc.id} \n ----> {doc.vector_distance}\n")
 
+def get_memory_usage():
+    process = psutil.Process(os.getpid())
+    memory = process.memory_info()
+    return memory.rss / (1024 * 1024)
 
 def main():
     clear_redis_store()
@@ -136,4 +145,17 @@ def main():
 
 
 if __name__ == "__main__":
+
+    start_time = time.time()
+    start_memory = get_memory_usage()
+
     main()
+
+    end_time = time.time()
+    end_memory = get_memory_usage()
+
+    execution_time = end_time - start_time
+    memory_used = end_memory - start_memory
+
+    print(f"Execution Time: {execution_time} seconds")
+    print(f"Memory Usage: {memory_used} MB")
