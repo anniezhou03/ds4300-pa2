@@ -1,12 +1,20 @@
 import chromadb
 import numpy as np
 import ollama
+import time
+import psutil
+import os
+import csv
+from datetime import datetime
+
 
 # Initialize ChromaDB client
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 collection_name = "document_embeddings"
 
-
+# all-minilm
+# mxbai-embed-large
+# nomic-embed-text
 def get_embedding(text: str, model: str = "nomic-embed-text") -> list:
     response = ollama.embeddings(model=model, prompt=text)
     return response["embedding"]
@@ -81,6 +89,11 @@ Answer:"""
 
     return response["message"]["content"]
 
+def get_memory_usage_mb():
+    process = psutil.Process(os.getpid())
+    memory = process.memory_info()
+    return memory.rss / (1024 * 1024)  # in MB
+
 
 def interactive_search():
     """Interactive search interface."""
@@ -92,7 +105,8 @@ def interactive_search():
 
         if query.lower() == "exit":
             break
-
+        start_time = time.time()
+        start_memory = get_memory_usage_mb()
         # Search for relevant embeddings
         context_results = search_embeddings(query)
 
@@ -101,6 +115,17 @@ def interactive_search():
 
         print("\n--- Response ---")
         print(response)
+        end_time = time.time()
+        end_memory = get_memory_usage_mb()
+
+        execution_time = end_time - start_time
+        memory_used = end_memory - start_memory
+
+        print("\n--- Response ---")
+        print(response)
+
+        print(f"\nExecution Time: {execution_time} seconds")
+        print(f"Memory Usage: {memory_used} MB")
 
 
 if __name__ == "__main__":

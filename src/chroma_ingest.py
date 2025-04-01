@@ -5,6 +5,9 @@ import chromadb
 import numpy as np
 import os
 import fitz
+import time
+import psutil
+
 
 # Initialize ChromaDB client
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
@@ -28,12 +31,13 @@ def create_chroma_collection():
     collection = chroma_client.create_collection(name=collection_name)
     print("ChromaDB collection created successfully.")
     return collection
-
-
-# Generate an embedding using nomic-embed-text
+#
+#
+#  Generate an embedding using nomic-embed-text
 def get_embedding(text: str, model: str = "nomic-embed-text") -> list:
     response = ollama.embeddings(model=model, prompt=text)
     return response["embedding"]
+
 
 
 # Store the embedding in ChromaDB
@@ -66,7 +70,7 @@ def extract_text_from_pdf(pdf_path):
 
 
 # Split the text into chunks with overlap
-def split_text_into_chunks(text, chunk_size=300, overlap=50):
+def split_text_into_chunks(text, chunk_size=500, overlap=100):
     """Split text into chunks of approximately chunk_size words with overlap."""
     words = text.split()
     chunks = []
@@ -107,16 +111,29 @@ def query_chroma(collection, query_text: str):
     for i, doc_id in enumerate(results['ids'][0]):
         print(f"{doc_id} \n ----> {results['distances'][0][i]}\n")
 
+def get_memory_usage_mb():
+    process = psutil.Process(os.getpid())
+    memory = process.memory_info()
+    return memory.rss / (1024 * 1024)  # in MB
+
 
 def main():
+    start_time = time.time()
+    start_memory = get_memory_usage_mb()
+
     clear_chroma_store()
     collection = create_chroma_collection()
 
     process_pdfs(collection, "../data/")
     print("\n---Done processing PDFs---\n")
     query_chroma(collection, "What is the capital of France?")
-    # At the end of main() function in ingest_chroma.py
     print("Available collections:", chroma_client.list_collections())
+
+    end_time = time.time()
+    end_memory = get_memory_usage_mb()
+
+    print(f"\nExecution Time: {end_time - start_time:.2f} seconds")
+    print(f"Memory Usage: {end_memory - start_memory:.2f} MB")
 
 
 if __name__ == "__main__":
