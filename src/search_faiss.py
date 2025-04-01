@@ -2,9 +2,12 @@ import faiss
 import json
 import numpy as np
 import ollama
+import time
+import psutil
+import os
 
 
-VECTOR_DIM = 768
+VECTOR_DIM = 384
 INDEX_NAME = "embedding_index"
 DOC_PREFIX = "doc:"
 DISTANCE_METRIC = faiss.METRIC_INNER_PRODUCT
@@ -17,7 +20,7 @@ def create_faiss_index(index_filename=INDEX_FILE):
     return index
 
 
-def get_embedding(text: str, model: str = "nomic-embed-text") -> list:
+def get_embedding(text: str, model: str = "all-minilm") -> list:
 
     response = ollama.embeddings(model=model, prompt=text)
     return response["embedding"]
@@ -67,10 +70,16 @@ def generate_rag_response(query, context_results, metadata):
 
     # Generate response using Ollama
     response = ollama.chat(
-        model="mistral:latest", messages=[{"role": "user", "content": prompt}]
+        model="llama3.2", messages=[{"role": "user", "content": prompt}]
     )
 
     return response["message"]["content"]
+
+
+def get_memory_usage():
+    process = psutil.Process(os.getpid())
+    memory = process.memory_info()
+    return memory.rss / (1024 * 1024)
 
 
 def interactive_search():
@@ -89,16 +98,25 @@ def interactive_search():
         if query.lower() == "exit":
             break
 
+        start_time = time.time()
+        start_memory = get_memory_usage()
+
         # Search for relevant embeddings
         context_results = search_embeddings(faiss_index, query)
 
         # Generate RAG response
         response = generate_rag_response(query, context_results, metadata)
 
+        end_time = time.time()
+        end_memory = get_memory_usage()
+        execution_time = end_time - start_time
+        memory_used = abs(end_memory - start_memory)
+
         print("\n--- Response ---")
         print(response)
 
-
+        print(f"\nExecution Time: {execution_time} seconds")
+        print(f"Memory Usage: {memory_used} MB")
 
 
 if __name__ == "__main__":
